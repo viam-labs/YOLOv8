@@ -12,10 +12,10 @@ Both locally deployed YOLOv8 models and models from web sources like [HuggingFac
 
 To use this module, follow these instructions to [add a module from the Viam Registry](https://docs.viam.com/registry/configure/#add-a-modular-resource-from-the-viam-registry) and select the `viam-labs:vision:yolov8` model from the [viam-labs YOLOv8 module](https://app.viam.com/module/viam-labs/yolov8).
 
-## Configure your vision
+## Configure your vision service
 
 > [!NOTE]  
-> Before configuring your vision, you must [create a machine](https://docs.viam.com/manage/fleet/machines/#add-a-new-machine).
+> Before configuring your vision service, you must [create a machine](https://docs.viam.com/manage/fleet/machines/#add-a-new-machine).
 
 Navigate to the **Config** tab of your robot’s page in [the Viam app](https://app.viam.com/).
 Click on the **Components** subtab and click **Create component**.
