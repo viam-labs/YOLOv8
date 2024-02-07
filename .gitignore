@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 ultralyticsplus/
 viam-env/
+module.tar.gz
