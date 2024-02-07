@@ -77,3 +77,15 @@ Note: if using this method, any cameras you are using must be set in the `depend
         "cam"
       ]
 ```
+
+### get_classifications(image=*binary*)
+
+### get_classifications_from_camera(camera_name=*string*)
+
+Note: if using this method, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
+
+```json
+      "depends_on": [
+        "cam"
+      ]
+```

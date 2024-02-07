@@ -22,7 +22,7 @@ from viam.services.vision import Vision
 from viam.components.camera import Camera
 from viam.logging import getLogger
 
-from ultralyticsplus import YOLO
+from ultralyticsplus import YOLO, postprocess_classify_output
 import torch
 
 import time
@@ -77,8 +77,7 @@ class yolov8(Vision, Reconfigurable):
         cam = cast(Camera, actual_cam)
         cam_image = await cam.get_image(mime_type="image/jpeg")
         return await self.get_detections(cam_image)
-
-    
+ 
     async def get_detections(
         self,
         image: Union[Image.Image, RawImage],
@@ -105,16 +104,10 @@ class yolov8(Vision, Reconfigurable):
         extra: Optional[Mapping[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> List[Classification]:
-        """Get a list of classifications in the next image given a camera and a classifier
-
-        Args:
-            camera_name (str): The name of the camera to use for detection
-            count (int): The number of classifications desired
-
-        returns:
-            List[viam.proto.service.vision.Classification]: The list of Classifications
-        """
-        ...
+        actual_cam = self.DEPS[Camera.get_resource_name(camera_name)]
+        cam = cast(Camera, actual_cam)
+        cam_image = await cam.get_image(mime_type="image/jpeg")
+        return await self.get_classifications(cam_image)
 
     
     async def get_classifications(
@@ -125,16 +118,13 @@ class yolov8(Vision, Reconfigurable):
         extra: Optional[Mapping[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> List[Classification]:
-        """Get a list of classifications in the given image using the specified classifier
-
-        Args:
-            image (Image): The image to get detections from
-            count (int): The number of classifications desired
-
-        Returns:
-            List[viam.proto.service.vision.Classification]: The list of Classifications
-        """
-        ...
+        classifications = []
+        results = self.model.predict(image, device=self.device)
+        if len(results) >= 1:
+            processed_results = postprocess_classify_output(self.model, result=results[0])
+            for key in processed_results:
+                classifications.append({"class_name": key, "confidence": processed_results[key]})
+        return classifications
 
     
     async def get_object_point_clouds(
