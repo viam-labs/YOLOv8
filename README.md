@@ -6,6 +6,8 @@ This model leverages the [Ultralytics inference library](https://docs.ultralytic
 
 Both locally deployed YOLOv8 models and models from web sources like [HuggingFace](https://huggingface.co/models?other=yolov8) can be used (HuggingFace models will be downloaded and used locally).
 
+![Example screen recording of usage](./demo.gif)
+
 ## Build and Run
 
 To use this module, follow these instructions to [add a module from the Viam Registry](https://docs.viam.com/registry/configure/#add-a-modular-resource-from-the-viam-registry) and select the `viam-labs:vision:yolov8` model from the [viam-labs YOLOv8 module](https://app.viam.com/module/viam-labs/yolov8).
