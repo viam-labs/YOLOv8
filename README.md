@@ -1,6 +1,6 @@
 # YOLOv8 modular service
 
-This module implements the [rdk vision API](https://github.com/rdk/vision-api) in a viam-labs:vision:yolov8 model.
+This module implements the [RDK vision API](https://github.com/rdk/vision-api) in a viam-labs:vision:yolov8 model.
 
 This model leverages the [Ultralytics inference library](https://docs.ultralytics.com/) to allow for object detection and classification from YOLOv8 models.
 
@@ -15,7 +15,7 @@ To use this module, follow these instructions to [add a module from the Viam Reg
 ## Configure your vision service
 
 > [!NOTE]  
-> Before configuring your vision service, you must [create a machine](https://docs.viam.com/manage/fleet/machines/#add-a-new-machine).
+> Before configuring your vision service, you must [create a machine](https://docs.viam.com/fleet/machines/#add-a-new-machine).
 
 Navigate to the **Config** tab of your robot’s page in [the Viam app](https://app.viam.com/).
 Click on the **Components** subtab and click **Create component**.
@@ -31,7 +31,7 @@ On the new component panel, copy and paste the following attribute template into
 ```
 
 > [!NOTE]  
-> For more information, see [Configure a Robot](https://docs.viam.com/manage/configuration/).
+> For more information, see [Configure a Robot](https://docs.viam.com/build/configure/).
 
 ### Attributes
 
