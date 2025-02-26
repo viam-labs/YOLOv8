@@ -8,13 +8,7 @@ Both locally deployed YOLOv8 models and models from web sources like [HuggingFac
 
 ![Example screen recording of usage](./demo.gif)
 
-## Build and Run
-
-To use this module, follow these instructions to [add a module from the Viam Registry](https://docs.viam.com/registry/configure/#add-a-modular-resource-from-the-viam-registry) and select the `viam-labs:vision:yolov8` model from the [viam-labs YOLOv8 module](https://app.viam.com/module/viam-labs/YOLOv8).
-
-## Configure your vision service
-
-> [!NOTE]  
+> [!NOTE]
 > Before configuring your vision service, you must [create a machine](https://docs.viam.com/fleet/machines/#add-a-new-machine).
 
 Navigate to the **Config** tab of your robot’s page in [the Viam app](https://app.viam.com/).
@@ -22,7 +16,9 @@ Click on the **Components** subtab and click **Create component**.
 Select the `vision` type, then select the `viam-labs:vision:yolov8` model.
 Enter a name for your vision and click **Create**.
 
-On the new component panel, copy and paste the following attribute template into your vision service's **Attributes** box:
+## Configure your vision service
+
+Copy and paste the following attribute template into your vision service's **Attributes** box:
 
 ```json
 {
@@ -30,7 +26,7 @@ On the new component panel, copy and paste the following attribute template into
 }
 ```
 
-> [!NOTE]  
+> [!NOTE]
 > For more information, see [Configure a Robot](https://docs.viam.com/build/configure/).
 
 ### Attributes
