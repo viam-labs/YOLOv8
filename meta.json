@@ -6,7 +6,9 @@
   "models": [
     {
       "api": "rdk:service:vision",
-      "model": "viam-labs:vision:yolov8"
+      "model": "viam-labs:vision:yolov8",
+      "markdown_link": "README.md#configure-your-vision-service",
+      "short_description": "Supports YOLOv8 inference, including models on HuggingFace"
     }
   ],
   "entrypoint": "run.sh"
