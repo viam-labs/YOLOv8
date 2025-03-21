@@ -9,10 +9,10 @@ from viam.proto.service.vision import Classification, Detection
 from viam.utils import ValueTypes
 
 
-from viam.module.types import Reconfigurable
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import ResourceName
 from viam.resource.base import ResourceBase
+from viam.resource.easy_resource import EasyResource
 from viam.resource.types import Model, ModelFamily
 
 from viam.services.vision import Vision, CaptureAllResult
@@ -33,7 +33,7 @@ MODEL_DIR = os.environ.get(
 )
 
 
-class yolov8(Vision, Reconfigurable):
+class yolov8(Vision, EasyResource):
     """
     Vision represents a Vision service.
     """
@@ -52,13 +52,11 @@ class yolov8(Vision, Reconfigurable):
     def new(
         cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
     ) -> Self:
-        my_class = cls(config.name)
-        my_class.reconfigure(config, dependencies)
-        return my_class
+        return super().new(config, dependencies)
 
     # Validates JSON Configuration
     @classmethod
-    def validate(cls, config: ComponentConfig):
+    def validate_config(cls, config: ComponentConfig):
         LOGGER.debug("Validating yolov8 service config")
         model = config.attributes.fields["model_location"].string_value
         if model == "":
@@ -74,6 +72,7 @@ class yolov8(Vision, Reconfigurable):
 
         LOGGER.debug(f"Configuring yolov8 model with {model_location}")
         self.DEPS = dependencies
+        self.task = str(attrs.get("task")) or None
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -95,9 +94,9 @@ class yolov8(Vision, Reconfigurable):
 
                 self.get_model()
 
-            self.model = YOLO(self.MODEL_PATH)
+            self.model = YOLO(self.MODEL_PATH, task=self.task)
         else:
-            self.model = YOLO(model_location)
+            self.model = YOLO(model_location, task=self.task)
 
         self.device = "cpu"
         if torch.cuda.is_available():

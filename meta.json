@@ -12,12 +12,15 @@
     }
   ],
   "build": {
-    "path": "module.tar.gz",
+    "build": "./build.sh",
+    "setup": "./setup.sh",
+    "path": "dist/archive.tar.gz",
     "arch": [
       "linux/arm64",
-      "linux/amd64"
+      "linux/amd64",
+      "darwin/arm64"
     ]
   },
-  "entrypoint": "./run.sh",
-  "first_run": "./setup.sh"
+  "entrypoint": "dist/main",
+  "first_run": ""
 }

@@ -22,7 +22,7 @@ Copy and paste the following attribute template into your vision service's **Att
 
 ```json
 {
-  "model_location": "<model_path>"
+  "model_location": "<string>"
 }
 ```
 
@@ -35,15 +35,26 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 
 | Name | Type | Inclusion | Description |
 | ---- | ---- | --------- | ----------- |
-| `model_location` | string | **Required** |  Local path or HuggingFace model identifier |
+| `model_location` | string | **Required** |  YOLO model name (such as "yolov8n.pt"), local path to model, or HuggingFace model repo identifier |
+| `model_name` | string | Optional |  Name of model file when using HuggingFace repo identifier as `model_location` |
+| `task` | string | Optional |  Name of computer vision task performed by the model: "detect" (default) or "classify" |
 
 ### Example Configurations
+
+YOLO base model:
+
+```json
+{
+  "model_location": "yolov8n.pt",
+}
+```
 
 [HuggingFace model](https://huggingface.co/keremberke/yolov8n-hard-hat-detection):
 
 ```json
 {
-  "model_location": "keremberke/yolov8n-hard-hat-detection"
+  "model_location": "keremberke/yolov8n-hard-hat-detection",
+  "model_name": "best.pt"
 }
 ```
 
