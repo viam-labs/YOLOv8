@@ -7,4 +7,6 @@ from viam.resource.registry import Registry, ResourceCreatorRegistration
 
 from .yolov8 import yolov8
 
-Registry.register_resource_creator(Vision.SUBTYPE, yolov8.MODEL, ResourceCreatorRegistration(yolov8.new, yolov8.validate))
+Registry.register_resource_creator(
+    Vision.API, yolov8.MODEL, ResourceCreatorRegistration(yolov8.new, yolov8.validate)
+)

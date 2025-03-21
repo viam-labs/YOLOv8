@@ -11,5 +11,13 @@
       "short_description": "Supports YOLOv8 inference, including models on HuggingFace"
     }
   ],
-  "entrypoint": "run.sh"
+  "build": {
+    "path": "module.tar.gz",
+    "arch": [
+      "linux/arm64",
+      "linux/amd64"
+    ]
+  },
+  "entrypoint": "./run.sh",
+  "first_run": "./setup.sh"
 }

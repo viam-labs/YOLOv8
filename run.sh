@@ -1,20 +1,19 @@
 #!/bin/bash
-cd `dirname $0`
 
-if [ -f .installed ]
-  then
-    source viam-env/bin/activate
-  else
-    python3 -m pip install --user virtualenv --break-system-packages
-    python3 -m venv viam-env
-    source viam-env/bin/activate
-    pip3 install --upgrade -r requirements.txt
-    if [ $? -eq 0 ]
-      then
-        touch .installed
-    fi
-fi
+set -euo pipefail
 
+cd $(dirname $0)
+
+VENV_NAME="${VIAM_MODULE_DATA}/venv"
+PYTHON="$VENV_NAME/bin/python"
+
+# uncomment for hot reloading
+# export PATH=$PATH:$HOME/.local/bin
+# uv venv $VENV_NAME
+# source $VENV_NAME/bin/activate
+
+uv pip install -r requirements.txt
 # Be sure to use `exec` so that termination signals reach the python process,
 # or handle forwarding termination signals manually
-exec python3 -m src $@
+echo "Starting module..."
+exec $PYTHON -m src $@
