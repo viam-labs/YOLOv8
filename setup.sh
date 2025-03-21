@@ -1,4 +1,7 @@
-#!/bin/sh
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 cd $(dirname $0)
 
 # Create a virtual environment to run our code
@@ -22,7 +25,13 @@ if ! uv venv $VENV_NAME; then
   exit 1
 fi
 
+source $VENV_NAME/bin/activate
+
 if ! uv pip install -r requirements.txt; then
   echo "unable to sync requirements to venv"
+  exit 1
+fi
+
+if ! uv pip install pyinstaller -Uq; then
   exit 1
 fi
