@@ -66,6 +66,14 @@ Local YOLOv8 model:
 }
 ```
 
+***Note:*** if using the `get_detections_from_camera` or `get_classifications_from_camera` API, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
+
+```json
+      "depends_on": [
+        "cam"
+      ]
+```
+
 ## API
 
 The YOLOv8 resource provides the following methods from Viam's built-in [rdk:service:vision API](https://python.viam.dev/autoapi/viam/services/vision/client/index.html)
@@ -74,22 +82,6 @@ The YOLOv8 resource provides the following methods from Viam's built-in [rdk:ser
 
 ### get_detections_from_camera(camera_name=*string*)
 
-Note: if using this method, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
-
-```json
-      "depends_on": [
-        "cam"
-      ]
-```
-
 ### get_classifications(image=*binary*)
 
 ### get_classifications_from_camera(camera_name=*string*)
-
-Note: if using this method, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
-
-```json
-      "depends_on": [
-        "cam"
-      ]
-```
