@@ -21,6 +21,7 @@
       "darwin/arm64"
     ]
   },
+  "markdown_link": "README.md",
   "entrypoint": "dist/main",
   "first_run": ""
 }
