@@ -8,9 +8,6 @@ Both locally deployed YOLOv8 models and models from web sources like [HuggingFac
 
 ![Example screen recording of usage](./demo.gif)
 
-> [!NOTE]
-> Before configuring your vision service, you must [create a machine](https://docs.viam.com/fleet/machines/#add-a-new-machine).
-
 Navigate to the **Config** tab of your robot’s page in [the Viam app](https://app.viam.com/).
 Click on the **Components** subtab and click **Create component**.
 Select the `vision` type, then select the `viam-labs:vision:yolov8` model.
@@ -25,9 +22,6 @@ Copy and paste the following attribute template into your vision service's **Att
   "model_location": "<string>"
 }
 ```
-
-> [!NOTE]
-> For more information, see [Configure a Robot](https://docs.viam.com/build/configure/).
 
 ### Attributes
 
