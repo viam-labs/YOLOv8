@@ -107,7 +107,7 @@ class yolov8(Vision, EasyResource):
     async def get_cam_image(self, camera_name: str) -> ViamImage:
         actual_cam = self.DEPS[Camera.get_resource_name(camera_name)]
         cam = cast(Camera, actual_cam)
-        cam_images, _ = await cam.get_images(filter_source_names=["color"])
+        cam_images, _ = await cam.get_images(filter_source_names=[camera_name])
         return cam_images[0]
 
     async def get_detections_from_camera(
