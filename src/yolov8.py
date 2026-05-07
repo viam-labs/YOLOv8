@@ -102,6 +102,19 @@ class yolov8(Vision, EasyResource):
         if torch.cuda.is_available():
             self.device = torch.cuda.current_device()
 
+        self.class_indices = None
+        classes = attrs.get("classes")
+        if classes:
+            name_to_idx = {name: idx for idx, name in self.model.names.items()}
+            unknown = [c for c in classes if c not in name_to_idx]
+            if unknown:
+                LOGGER.error(
+                    f"classes {unknown} not found in model; ignoring. "
+                    f"Available: {sorted(name_to_idx.keys())}"
+                )
+            indices = [name_to_idx[c] for c in classes if c in name_to_idx]
+            self.class_indices = indices or None
+
         return
 
     async def get_cam_image(self, camera_name: str) -> ViamImage:
@@ -127,7 +140,9 @@ class yolov8(Vision, EasyResource):
         timeout: Optional[float] = None,
     ) -> List[Detection]:
         detections = []
-        results = self.model.predict(viam_to_pil_image(image), device=self.device)
+        results = self.model.predict(
+            viam_to_pil_image(image), device=self.device, classes=self.class_indices
+        )
         if len(results) >= 1:
             index = 0
             result = results[0]
