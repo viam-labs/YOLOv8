@@ -1,0 +1,27 @@
+# see https://github.com/viamrobotics/build-action for help
+on:
+  push:
+    tags:
+      # we support 0.0.1, v0.0.1, 0.0.1-rc1, v0.0.1-rc1
+      - "v?[0-9]+.[0-9]+.[0-9]+"
+      - "v?[0-9]+.[0-9]+.[0-9]+-rc[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # viamrobotics/build-action@v1.7
+      - uses: viamrobotics/build-action@cd35d596eabba93e9b6776f708c54865ec1c8360
+        with:
+          # note: you can replace this line with 'version: ""' if
+          # you want to test the build process without deploying
+          version: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
+          key-id: ${{ secrets.viam_key_id }}
+          key-value: ${{ secrets.viam_key_value }}
+          token: ${{ github.token }} # only required for private git repos
