@@ -47,34 +47,11 @@ class yolov8(Vision, EasyResource):
     model: YOLO
     device: str
 
-    # Constructor
     @classmethod
     def new(
         cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
     ) -> Self:
-        return super().new(config, dependencies)
-
-    # Validates JSON Configuration
-    @classmethod
-    def validate_config(cls, config: ComponentConfig):
-        LOGGER.debug("Validating yolov8 service config")
-        model = config.attributes.fields["model_location"].string_value
-        if model == "":
-            raise Exception("A model_location must be defined")
-
-        task = config.attributes.fields["task"].string_value
-        classes = config.attributes.fields["classes"].list_value
-        if classes.values and task not in ("", "detect"):
-            raise Exception(
-                f"classes is only supported when task is 'detect'; got task='{task}'"
-            )
-
-        return []
-
-    # Handles attribute reconfiguration
-    def reconfigure(
-        self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
-    ):
+        self = super().new(config, dependencies)
         attrs = struct_to_dict(config.attributes)
         model_location = str(attrs.get("model_location"))
 
@@ -123,7 +100,23 @@ class yolov8(Vision, EasyResource):
             indices = [name_to_idx[c] for c in classes if c in name_to_idx]
             self.class_indices = indices or None
 
-        return
+        return self
+
+    @classmethod
+    def validate_config(cls, config: ComponentConfig):
+        LOGGER.debug("Validating yolov8 service config")
+        model = config.attributes.fields["model_location"].string_value
+        if model == "":
+            raise Exception("A model_location must be defined")
+
+        task = config.attributes.fields["task"].string_value
+        classes = config.attributes.fields["classes"].list_value
+        if classes.values and task not in ("", "detect"):
+            raise Exception(
+                f"classes is only supported when task is 'detect'; got task='{task}'"
+            )
+
+        return [], []
 
     async def get_cam_image(self, camera_name: str) -> ViamImage:
         actual_cam = self.DEPS[Camera.get_resource_name(camera_name)]
