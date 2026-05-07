@@ -61,6 +61,14 @@ class yolov8(Vision, EasyResource):
         model = config.attributes.fields["model_location"].string_value
         if model == "":
             raise Exception("A model_location must be defined")
+
+        task = config.attributes.fields["task"].string_value
+        classes = config.attributes.fields["classes"].list_value
+        if classes.values and task not in ("", "detect"):
+            raise Exception(
+                f"classes is only supported when task is 'detect'; got task='{task}'"
+            )
+
         return []
 
     # Handles attribute reconfiguration
