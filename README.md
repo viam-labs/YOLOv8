@@ -33,6 +33,7 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | `model_name` | string | Optional |  Name of model file when using HuggingFace repo identifier as `model_location` |
 | `task` | string | Optional |  Name of computer vision task performed by the model: "detect" (default) or "classify" |
 | `classes` | list of strings | Optional |  Restrict detections to the listed class names (e.g. `["cup"]`). Names must match `model.names`; unknown names are logged and skipped. Applies only when `task` is `"detect"`. |
+| `source_name` | string | Optional |  Image source name to select on multi-source cameras (e.g. `"color"` on an RGBD camera). When omitted, the first image returned by the camera is used. |
 
 ### Example Configurations
 
