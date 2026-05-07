@@ -32,6 +32,7 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | `model_location` | string | **Required** |  YOLO model name (such as "yolov8n.pt"), local path to model, or HuggingFace model repo identifier |
 | `model_name` | string | Optional |  Name of model file when using HuggingFace repo identifier as `model_location` |
 | `task` | string | Optional |  Name of computer vision task performed by the model: "detect" (default) or "classify" |
+| `classes` | list of strings | Optional |  Restrict detections to the listed class names (e.g. `["cup"]`). Names must match `model.names`; unknown names are logged and skipped. Applies only when `task` is `"detect"`. |
 
 ### Example Configurations
 
