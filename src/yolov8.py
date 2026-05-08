@@ -19,14 +19,11 @@ from viam.services.vision import Vision, CaptureAllResult
 from viam.proto.service.vision import GetPropertiesResponse
 from viam.components.camera import Camera, ViamImage
 from viam.media.utils.pil import viam_to_pil_image
-from viam.logging import getLogger
 from viam.utils import struct_to_dict
 
 from ultralytics.engine.results import Results
 from ultralytics import YOLO
 import torch
-
-LOGGER = getLogger(__name__)
 
 MODEL_DIR = os.environ.get(
     "VIAM_MODULE_DATA", os.path.join(os.path.expanduser("~"), ".data", "models")
@@ -47,40 +44,19 @@ class yolov8(Vision, EasyResource):
     model: YOLO
     device: str
 
-    # Constructor
     @classmethod
     def new(
         cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
     ) -> Self:
-        return super().new(config, dependencies)
-
-    # Validates JSON Configuration
-    @classmethod
-    def validate_config(cls, config: ComponentConfig):
-        LOGGER.debug("Validating yolov8 service config")
-        model = config.attributes.fields["model_location"].string_value
-        if model == "":
-            raise Exception("A model_location must be defined")
-
-        task = config.attributes.fields["task"].string_value
-        classes = config.attributes.fields["classes"].list_value
-        if classes.values and task not in ("", "detect"):
-            raise Exception(
-                f"classes is only supported when task is 'detect'; got task='{task}'"
-            )
-
-        return []
-
-    # Handles attribute reconfiguration
-    def reconfigure(
-        self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
-    ):
+        self = super().new(config, dependencies)
         attrs = struct_to_dict(config.attributes)
         model_location = str(attrs.get("model_location"))
 
-        LOGGER.debug(f"Configuring yolov8 model with {model_location}")
+        self.logger.debug(f"Configuring yolov8 model with {model_location}")
         self.DEPS = dependencies
         self.task = str(attrs.get("task")) or None
+        self.source_name = attrs.get("source_name") or None
+        self.verbose = bool(attrs.get("verbose", False))
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -116,19 +92,37 @@ class yolov8(Vision, EasyResource):
             name_to_idx = {name: idx for idx, name in self.model.names.items()}
             unknown = [c for c in classes if c not in name_to_idx]
             if unknown:
-                LOGGER.error(
+                self.logger.error(
                     f"classes {unknown} not found in model; ignoring. "
                     f"Available: {sorted(name_to_idx.keys())}"
                 )
             indices = [name_to_idx[c] for c in classes if c in name_to_idx]
             self.class_indices = indices or None
 
-        return
+        return self
+
+    @classmethod
+    def validate_config(cls, config: ComponentConfig):
+        model = config.attributes.fields["model_location"].string_value
+        if model == "":
+            raise Exception("A model_location must be defined")
+
+        task = config.attributes.fields["task"].string_value
+        classes = config.attributes.fields["classes"].list_value
+        if classes.values and task not in ("", "detect"):
+            raise Exception(
+                f"classes is only supported when task is 'detect'; got task='{task}'"
+            )
+
+        return [], []
 
     async def get_cam_image(self, camera_name: str) -> ViamImage:
         actual_cam = self.DEPS[Camera.get_resource_name(camera_name)]
         cam = cast(Camera, actual_cam)
-        cam_images, _ = await cam.get_images(filter_source_names=[camera_name])
+        if self.source_name:
+            cam_images, _ = await cam.get_images(filter_source_names=[self.source_name])
+        else:
+            cam_images, _ = await cam.get_images()
         return cam_images[0]
 
     async def get_detections_from_camera(
@@ -149,7 +143,10 @@ class yolov8(Vision, EasyResource):
     ) -> List[Detection]:
         detections = []
         results = self.model.predict(
-            viam_to_pil_image(image), device=self.device, classes=self.class_indices
+            viam_to_pil_image(image),
+            device=self.device,
+            classes=self.class_indices,
+            verbose=self.verbose,
         )
         if len(results) >= 1:
             index = 0
@@ -188,7 +185,9 @@ class yolov8(Vision, EasyResource):
         timeout: Optional[float] = None,
     ) -> List[Classification]:
         classifications = []
-        results = self.model.predict(viam_to_pil_image(image), device=self.device)
+        results = self.model.predict(
+            viam_to_pil_image(image), device=self.device, verbose=self.verbose
+        )
         if len(results) >= 1:
             processed_results = postprocess_classify_output(
                 self.model, result=results[0]
@@ -253,12 +252,12 @@ class yolov8(Vision, EasyResource):
     def get_model(self):
         if not os.path.exists(self.MODEL_PATH):
             MODEL_URL = f"https://huggingface.co/{self.MODEL_REPO}/resolve/main/{self.MODEL_FILE}"
-            LOGGER.debug(f"Fetching model {self.MODEL_FILE} from {MODEL_URL}")
+            self.logger.debug(f"Fetching model {self.MODEL_FILE} from {MODEL_URL}")
             urlretrieve(MODEL_URL, self.MODEL_PATH, self.log_progress)
 
     def log_progress(self, count: int, block_size: int, total_size: int) -> None:
         percent = count * block_size * 100 // total_size
-        LOGGER.debug(f"\rDownloading {self.MODEL_FILE}: {percent}%")
+        self.logger.debug(f"\rDownloading {self.MODEL_FILE}: {percent}%")
 
 
 # vendored and updated from ultralyticsplus library
