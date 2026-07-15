@@ -1,2 +1,2 @@
-viam-sdk~=0.75.0
+viam-sdk~=0.79.1
 ultralytics~=8.3.94
