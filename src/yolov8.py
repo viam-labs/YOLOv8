@@ -57,6 +57,7 @@ class yolov8(Vision, EasyResource):
         self.task = str(attrs.get("task")) or None
         self.source_name = attrs.get("source_name") or None
         self.verbose = bool(attrs.get("verbose", False))
+        self.confidence = float(attrs.get("confidence", 0.25))
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -114,6 +115,13 @@ class yolov8(Vision, EasyResource):
                 f"classes is only supported when task is 'detect'; got task='{task}'"
             )
 
+        if "confidence" in config.attributes.fields:
+            confidence = config.attributes.fields["confidence"].number_value
+            if not 0 < confidence <= 1:
+                raise Exception(
+                    f"confidence must be in (0, 1]; got {confidence}"
+                )
+
         return [], []
 
     async def get_cam_image(self, camera_name: str) -> ViamImage:
@@ -146,6 +154,7 @@ class yolov8(Vision, EasyResource):
             viam_to_pil_image(image),
             device=self.device,
             classes=self.class_indices,
+            conf=self.confidence,
             verbose=self.verbose,
         )
         if len(results) >= 1:
