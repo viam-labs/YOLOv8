@@ -31,6 +31,7 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | ---- | ---- | --------- | ----------- |
 | `model_location` | string | **Required** |  YOLO model name (such as "yolov8n.pt"), local path to model, or HuggingFace model repo identifier |
 | `model_name` | string | Optional |  Name of model file when using HuggingFace repo identifier as `model_location` |
+| `camera_name` | string | Optional |  Name of the camera to read from in the `*_from_camera` methods. Declared as an implicit dependency, so the camera is started before this service. |
 | `task` | string | Optional |  Name of computer vision task performed by the model: "detect" (default) or "classify" |
 | `classes` | list of strings | Optional |  Restrict detections to the listed class names (e.g. `["cup"]`). Names must match `model.names`; unknown names are logged and skipped. Applies only when `task` is `"detect"`. |
 | `source_name` | string | Optional |  Image source name to select on multi-source cameras (e.g. `"color"` on an RGBD camera). When omitted, the first image returned by the camera is used. |
@@ -63,13 +64,18 @@ Local YOLOv8 model:
 }
 ```
 
-***Note:*** if using the `get_detections_from_camera` or `get_classifications_from_camera` API, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
+***Note:*** if using the `get_detections_from_camera`, `get_classifications_from_camera` or `capture_all_from_camera` API, set `camera_name` to the camera you want to read from:
 
 ```json
-      "depends_on": [
-        "cam"
-      ]
+{
+  "model_location": "yolov8n.pt",
+  "camera_name": "cam"
+}
 ```
+
+`viam-server` resolves `camera_name` as an implicit dependency and starts that camera before this service, so there is no need to add a `depends_on` entry.
+
+The `*_from_camera` methods take a camera name as an argument. Leave it empty to use the configured `camera_name`, or pass the name of any camera the service depends on. Existing configurations that list their cameras in `depends_on` continue to work unchanged.
 
 ## API
 
