@@ -16,7 +16,7 @@ jobs:
       # actions/checkout@v6.0.2
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       # viamrobotics/build-action@v1.7
-      - uses: viamrobotics/build-action@cd35d596eabba93e9b6776f708c54865ec1c8360
+      - uses: viamrobotics/build-action@b885e11b378e05476ee0109c9fc8ecb387b508e2
         with:
           # note: you can replace this line with 'version: ""' if
           # you want to test the build process without deploying
