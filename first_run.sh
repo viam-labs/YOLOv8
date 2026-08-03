@@ -9,15 +9,20 @@
 # stderr is logged at WARN, so the messages below are visible with
 # `viam machines part logs` or in the app.
 #
-# NOTE ON THE EXIT CODE: this script always exits 0, even when it cannot install
-# anything. A non-zero exit from a first_run script makes the RDK abort the
-# *entire machine's* reconfiguration and fall back to the previous config -- not
-# just this module -- so a host where we are unable to install packages would
-# take every unrelated resource on the machine down with it. Exiting 0 instead
-# leaves this module to fail on its own with the usual
-# "cannot open shared object file" error, exactly as it did before this script
-# existed, while the guidance printed below tells the operator precisely what to
-# install by hand.
+# EXIT CODE: this script exits non-zero when the libraries are missing and could
+# not be installed. That deliberately aborts the machine's reconfiguration -- the
+# RDK keeps the previous working config, leaves already-running modules running,
+# and marks this module's package as failed -- rather than letting the machine
+# come up with a module that cannot start. Because no success marker is written
+# on failure, first_run is retried automatically once the host is fixed.
+#
+# THROTTLING: an aborted reconfiguration is retried on every cloud config
+# refresh (~10s by default), because the RDK only advances its stored config
+# after the first_run phase succeeds. Re-running a package install that often
+# would hold the package-manager lock and fight the very operator trying to fix
+# the host, so the install attempt is rate-limited to once per
+# RETRY_INTERVAL_SECONDS. The diagnostic below is still printed, and the exit
+# code is still non-zero, on every single run -- only the install is skipped.
 
 set -uo pipefail
 
@@ -51,6 +56,29 @@ MANUAL_PACKAGES=""
 # Filled in by resolve_packages().
 PACKAGES=()
 UNRESOLVED=()
+
+# Minimum gap between real install attempts. See THROTTLING above.
+readonly RETRY_INTERVAL_SECONDS=600
+# Deliberately under /tmp: cleared on reboot, so a reboot always gets a fresh
+# attempt, and writable whether or not this runs as root.
+ATTEMPT_STAMP="${TMPDIR:-/tmp}/viam-first-run-$(echo "$MODULE_NAME" | tr -c 'a-zA-Z0-9' '-').last-failure"
+
+now_seconds() { date +%s; }
+
+record_failed_attempt() { now_seconds >"$ATTEMPT_STAMP" 2>/dev/null || true; }
+
+clear_failed_attempt() { rm -f "$ATTEMPT_STAMP" 2>/dev/null || true; }
+
+# True when a previous attempt failed recently enough that retrying the package
+# manager now would just add lock contention.
+attempt_throttled() {
+    local last age
+    [ -r "$ATTEMPT_STAMP" ] || return 1
+    last=$(cat "$ATTEMPT_STAMP" 2>/dev/null) || return 1
+    case "$last" in '' | *[!0-9]*) return 1 ;; esac
+    age=$(($(now_seconds) - last))
+    [ "$age" -ge 0 ] && [ "$age" -lt "$RETRY_INTERVAL_SECONDS" ]
+}
 
 # --------------------------------------------------------------------------- #
 # Detecting what is already present
@@ -287,8 +315,10 @@ report_unresolved() {
         esac
     fi
     warn ""
-    warn "Until then $MODULE_NAME will fail to start with"
-    warn "\"cannot open shared object file\" for the libraries listed above."
+    warn "This module cannot start without these libraries, so first_run is"
+    warn "failing on purpose. The machine will keep running its previous"
+    warn "configuration and will not apply the new one until this is fixed."
+    warn "Once the libraries are installed the machine retries automatically."
     warn "-----------------------------------------------------------------"
 }
 
@@ -339,6 +369,7 @@ main() {
 
     if [ ${#missing[@]} -eq 0 ]; then
         log "$MODULE_NAME: all required system libraries are already present"
+        clear_failed_attempt
         exit 0
     fi
     log "$MODULE_NAME: missing system libraries: ${missing[*]}"
@@ -346,7 +377,15 @@ main() {
     local mgr=""
     if ! mgr=$(detect_package_manager); then
         report_unresolved "" "no supported package manager found (looked for apt-get, dnf, yum, zypper, pacman, apk)" "${missing[@]}"
-        exit 0
+        record_failed_attempt
+        exit 1
+    fi
+
+    # Still fails loudly below -- only the package-manager work is skipped. See
+    # THROTTLING at the top of this file.
+    if attempt_throttled; then
+        report_unresolved "$mgr" "a previous install attempt failed less than ${RETRY_INTERVAL_SECONDS}s ago; not retrying the package manager yet" "${missing[@]}"
+        exit 1
     fi
     log "using package manager: $mgr"
 
@@ -359,7 +398,8 @@ main() {
         log "not running as root; escalating with passwordless sudo"
     else
         report_unresolved "$mgr" "running as uid $(id -u) and passwordless sudo is unavailable" "${missing[@]}"
-        exit 0
+        record_failed_attempt
+        exit 1
     fi
 
     resolve_packages "$mgr" "${missing[@]}"
@@ -378,7 +418,8 @@ main() {
 
     if [ ${#PACKAGES[@]} -eq 0 ]; then
         report_unresolved "$mgr" "could not map the missing libraries to any available package on this distro" "${missing[@]}"
-        exit 0
+        record_failed_attempt
+        exit 1
     fi
 
     # Read by report_unresolved so the manual command it prints is exactly what
@@ -400,11 +441,13 @@ main() {
 
     if [ ${#still_missing[@]} -eq 0 ]; then
         log "$MODULE_NAME: all required system libraries are now present"
+        clear_failed_attempt
         exit 0
     fi
 
     report_unresolved "$mgr" "still missing after installing $MANUAL_PACKAGES" "${still_missing[@]}"
-    exit 0
+    record_failed_attempt
+    exit 1
 }
 
 main "$@"

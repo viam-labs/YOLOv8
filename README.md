@@ -36,11 +36,18 @@ installed on a machine, so in most cases there is nothing to do. It supports
 for the distro, and does nothing on macOS.
 
 If it cannot install them — for example the module is not running as root and
-passwordless `sudo` is unavailable — it logs the exact command to run by hand
-and exits without failing, so it never blocks the rest of the machine from
-reconfiguring. Look for `[first_run]` lines in the machine logs. Until the
-libraries are present the module fails to start with
-`cannot open shared object file`.
+passwordless `sudo` is unavailable — it **fails loudly**: it logs the exact
+command to run by hand and exits non-zero. That aborts the machine's
+reconfiguration, so the machine keeps running its previous, working config
+instead of coming up with a module that cannot start. Already-running modules
+are left alone. Look for `[first_run]` lines in the machine logs.
+
+Once the libraries are installed the machine picks them up on its next
+reconfiguration — no success marker is written on failure, so `first_run` is
+retried automatically. Because an aborted reconfiguration is retried every few
+seconds, the install attempt itself is rate-limited to once every 10 minutes to
+avoid fighting the package-manager lock; the diagnostic and the non-zero exit
+still happen on every attempt.
 
 ## Configure your vision service
 
