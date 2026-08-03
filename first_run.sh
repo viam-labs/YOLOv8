@@ -59,21 +59,37 @@ UNRESOLVED=()
 
 # Minimum gap between real install attempts. See THROTTLING above.
 readonly RETRY_INTERVAL_SECONDS=600
-# Deliberately under /tmp: cleared on reboot, so a reboot always gets a fresh
-# attempt, and writable whether or not this runs as root.
-ATTEMPT_STAMP="${TMPDIR:-/tmp}/viam-first-run-$(echo "$MODULE_NAME" | tr -c 'a-zA-Z0-9' '-').last-failure"
+
+# Where the last failed attempt is recorded. Placed as a sibling of the module
+# directory, mirroring where the RDK keeps its own `.first_run_succeeded`
+# marker, because that directory is root-owned. A world-writable location such
+# as /tmp would let any local user pre-create this path as a symlink and have
+# us truncate the target while running as root. When VIAM_MODULE_ROOT is not set
+# -- someone running this script by hand, outside the RDK -- throttling is
+# simply disabled, which is the right behavior for a manual invocation.
+ATTEMPT_STAMP=""
+if [ -n "${VIAM_MODULE_ROOT:-}" ]; then
+    ATTEMPT_STAMP="${VIAM_MODULE_ROOT%/}.first_run_last_failure"
+fi
 
 now_seconds() { date +%s; }
 
-record_failed_attempt() { now_seconds >"$ATTEMPT_STAMP" 2>/dev/null || true; }
+record_failed_attempt() {
+    [ -n "$ATTEMPT_STAMP" ] || return 0
+    now_seconds >"$ATTEMPT_STAMP" 2>/dev/null || true
+}
 
-clear_failed_attempt() { rm -f "$ATTEMPT_STAMP" 2>/dev/null || true; }
+clear_failed_attempt() {
+    [ -n "$ATTEMPT_STAMP" ] || return 0
+    rm -f "$ATTEMPT_STAMP" 2>/dev/null || true
+}
 
 # True when a previous attempt failed recently enough that retrying the package
 # manager now would just add lock contention.
 attempt_throttled() {
     local last age
-    [ -r "$ATTEMPT_STAMP" ] || return 1
+    [ -n "$ATTEMPT_STAMP" ] || return 1
+    [ -f "$ATTEMPT_STAMP" ] || return 1
     last=$(cat "$ATTEMPT_STAMP" 2>/dev/null) || return 1
     case "$last" in '' | *[!0-9]*) return 1 ;; esac
     age=$(($(now_seconds) - last))
