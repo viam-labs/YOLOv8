@@ -13,6 +13,29 @@ Click on the **Components** subtab and click **Create component**.
 Select the `vision` type, then select the `viam-labs:vision:yolov8` model.
 Enter a name for your vision and click **Create**.
 
+## System dependencies
+
+This module uses the **headless** OpenCV wheel (`opencv-python-headless`), which
+is the same `cv2` API and version as `opencv-python` but is not linked against
+Qt/X11. That matters because the GUI build pulls in `libGL.so.1`, `libX11.so.6`,
+`libxcb.so.1`, `libICE.so.6`, `libSM.so.6`, `libXext.so.6`, `libglib-2.0.so.0`
+and `libgthread-2.0.so.0` at import time — none of which ship on a server or
+minimal container image. Without them the module fails to start with
+`cannot open shared object file`, which then surfaces as a confusing
+`model not registered` cascade on every resource that depends on it.
+
+With the headless wheel the only external library `cv2` needs is `libz.so.1`,
+which is part of every Linux base system, so **no extra packages have to be
+installed on the machine**.
+
+Keep it headless. If you ever need a GUI-only OpenCV call (`cv2.imshow`,
+`cv2.waitKey`, `cv2.namedWindow` and friends), those are unavailable in this
+wheel by design — a module has no display to draw on.
+
+`ultralytics` declares a hard dependency on `opencv-python`, so `setup.sh`
+replaces it with the headless wheel after installing requirements. That step is
+what keeps the shipped bundle free of the Qt linkage.
+
 ## Configure your vision service
 
 Copy and paste the following attribute template into your vision service's **Attributes** box:
