@@ -13,6 +13,42 @@ Click on the **Components** subtab and click **Create component**.
 Select the `vision` type, then select the `viam-labs:vision:yolov8` model.
 Enter a name for your vision and click **Create**.
 
+## System dependencies
+
+This module needs a few shared libraries that are not bundled inside it:
+
+| Library | Debian / Ubuntu | Fedora / RHEL |
+| --- | --- | --- |
+| `libGL.so.1` | `libgl1` | `mesa-libGL` |
+| `libICE.so.6` | `libice6` | `libICE` |
+| `libSM.so.6` | `libsm6` | `libSM` |
+| `libX11.so.6` | `libx11-6` | `libX11` |
+| `libXext.so.6` | `libxext6` | `libXext` |
+| `libglib-2.0.so.0`, `libgthread-2.0.so.0` | `libglib2.0-0t64` (`libglib2.0-0` before Ubuntu 24.04) | `glib2` |
+| `libxcb.so.1` | `libxcb1` | `libxcb` |
+| `libz.so.1` | `zlib1g` | `zlib-ng-compat` |
+
+These come from the Qt GUI stack that the non-headless `opencv-python` wheel links against, which is why the module needs `libGL` even though it never opens a window. A desktop image usually has them already; a server or minimal container image does not.
+
+`first_run.sh` installs them automatically the first time the module is
+installed on a machine, so in most cases there is nothing to do. It supports
+`apt`, `dnf`/`yum`, `zypper`, `pacman` and `apk`, picks the right package name
+for the distro, and does nothing on macOS.
+
+If it cannot install them — for example the module is not running as root and
+passwordless `sudo` is unavailable — it **fails loudly**: it logs the exact
+command to run by hand and exits non-zero. That aborts the machine's
+reconfiguration, so the machine keeps running its previous, working config
+instead of coming up with a module that cannot start. Already-running modules
+are left alone. Look for `[first_run]` lines in the machine logs.
+
+Once the libraries are installed the machine picks them up on its next
+reconfiguration — no success marker is written on failure, so `first_run` is
+retried automatically. Because an aborted reconfiguration is retried every few
+seconds, the install attempt itself is rate-limited to once every 10 minutes to
+avoid fighting the package-manager lock; the diagnostic and the non-zero exit
+still happen on every attempt.
+
 ## Configure your vision service
 
 Copy and paste the following attribute template into your vision service's **Attributes** box:
