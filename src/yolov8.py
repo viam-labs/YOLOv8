@@ -43,6 +43,7 @@ class yolov8(Vision, EasyResource):
 
     model: YOLO
     device: str
+    confidence: float
 
     @classmethod
     def new(
@@ -58,6 +59,7 @@ class yolov8(Vision, EasyResource):
         self.source_name = attrs.get("source_name") or None
         self.camera_name = str(attrs.get("camera_name", ""))
         self.verbose = bool(attrs.get("verbose", False))
+        self.confidence = float(attrs.get("confidence", 0.25))
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -117,6 +119,13 @@ class yolov8(Vision, EasyResource):
                 f"classes is only supported when task is 'detect'; got task='{task}'"
             )
 
+        if "confidence" in config.attributes.fields:
+            confidence = config.attributes.fields["confidence"].number_value
+            if not 0 < confidence <= 1:
+                raise Exception(
+                    f"confidence must be in (0, 1]; got {confidence}"
+                )
+
         camera_name = config.attributes.fields["camera_name"].string_value
         required_deps = [camera_name] if camera_name != "" else []
 
@@ -174,6 +183,7 @@ class yolov8(Vision, EasyResource):
             viam_to_pil_image(image),
             device=self.device,
             classes=self.class_indices,
+            conf=self.confidence,
             verbose=self.verbose,
         )
         if len(results) >= 1:
