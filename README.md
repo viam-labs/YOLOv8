@@ -35,7 +35,7 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | `classes` | list of strings | Optional |  Restrict detections to the listed class names (e.g. `["cup"]`). Names must match `model.names`; unknown names are logged and skipped. Applies only when `task` is `"detect"`. |
 | `source_name` | string | Optional |  Image source name to select on multi-source cameras (e.g. `"color"` on an RGBD camera). When omitted, the first image returned by the camera is used. |
 | `verbose` | bool | Optional |  Enable Ultralytics' per-prediction logging to stdout. Defaults to `false`. Set to `true` only for debugging — it is very chatty. |
-| `confidence` | float | Optional |  Minimum detection confidence in (0, 1]. Defaults to `0.25` (the Ultralytics default). Lower it when a downstream stage filters detections itself and misses are costlier than false positives. |
+| `confidence` | float | Optional |  Minimum detection confidence in (0, 1]. Defaults to `0.25` (the Ultralytics default). |
 
 ### Example Configurations
 
