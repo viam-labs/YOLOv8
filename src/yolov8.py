@@ -59,8 +59,7 @@ class yolov8(Vision, EasyResource):
         self.source_name = attrs.get("source_name") or None
         self.camera_name = str(attrs.get("camera_name", ""))
         self.verbose = bool(attrs.get("verbose", False))
-        # Default to None so predict() inherits ultralytics' own confidence
-        # default rather than pinning it here (which would drift on an upgrade).
+        # None so predict() inherits ultralytics' default instead of pinning it.
         confidence = attrs.get("confidence")
         self.confidence = float(confidence) if confidence is not None else None
 
