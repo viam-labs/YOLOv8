@@ -43,7 +43,7 @@ class yolov8(Vision, EasyResource):
 
     model: YOLO
     device: str
-    confidence: Optional[float]
+    confidence: float
 
     @classmethod
     def new(
@@ -59,9 +59,7 @@ class yolov8(Vision, EasyResource):
         self.source_name = attrs.get("source_name") or None
         self.camera_name = str(attrs.get("camera_name", ""))
         self.verbose = bool(attrs.get("verbose", False))
-        # None so predict() inherits ultralytics' default instead of pinning it.
-        confidence = attrs.get("confidence")
-        self.confidence = float(confidence) if confidence is not None else None
+        self.confidence = float(attrs.get("confidence", 0.25))
 
         if "/" in model_location:
             if self.is_path(model_location):
