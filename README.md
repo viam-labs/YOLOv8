@@ -13,6 +13,42 @@ Click on the **Components** subtab and click **Create component**.
 Select the `vision` type, then select the `viam-labs:vision:yolov8` model.
 Enter a name for your vision and click **Create**.
 
+## System dependencies
+
+This module needs a few shared libraries that are not bundled inside it:
+
+| Library | Debian / Ubuntu | Fedora / RHEL |
+| --- | --- | --- |
+| `libGL.so.1` | `libgl1` | `mesa-libGL` |
+| `libICE.so.6` | `libice6` | `libICE` |
+| `libSM.so.6` | `libsm6` | `libSM` |
+| `libX11.so.6` | `libx11-6` | `libX11` |
+| `libXext.so.6` | `libxext6` | `libXext` |
+| `libglib-2.0.so.0`, `libgthread-2.0.so.0` | `libglib2.0-0t64` (`libglib2.0-0` before Ubuntu 24.04) | `glib2` |
+| `libxcb.so.1` | `libxcb1` | `libxcb` |
+| `libz.so.1` | `zlib1g` | `zlib-ng-compat` |
+
+These come from the Qt GUI stack that the non-headless `opencv-python` wheel links against, which is why the module needs `libGL` even though it never opens a window. A desktop image usually has them already; a server or minimal container image does not.
+
+`first_run.sh` installs them automatically the first time the module is
+installed on a machine, so in most cases there is nothing to do. It supports
+`apt`, `dnf`/`yum`, `zypper`, `pacman` and `apk`, picks the right package name
+for the distro, and does nothing on macOS.
+
+If it cannot install them — for example the module is not running as root and
+passwordless `sudo` is unavailable — it **fails loudly**: it logs the exact
+command to run by hand and exits non-zero. That aborts the machine's
+reconfiguration, so the machine keeps running its previous, working config
+instead of coming up with a module that cannot start. Already-running modules
+are left alone. Look for `[first_run]` lines in the machine logs.
+
+Once the libraries are installed the machine picks them up on its next
+reconfiguration — no success marker is written on failure, so `first_run` is
+retried automatically. Because an aborted reconfiguration is retried every few
+seconds, the install attempt itself is rate-limited to once every 10 minutes to
+avoid fighting the package-manager lock; the diagnostic and the non-zero exit
+still happen on every attempt.
+
 ## Configure your vision service
 
 Copy and paste the following attribute template into your vision service's **Attributes** box:
@@ -31,11 +67,12 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | ---- | ---- | --------- | ----------- |
 | `model_location` | string | **Required** |  YOLO model name (such as "yolov8n.pt"), local path to model, or HuggingFace model repo identifier |
 | `model_name` | string | Optional |  Name of model file when using HuggingFace repo identifier as `model_location` |
+| `camera_name` | string | Optional |  Name of the camera to read from in the `*_from_camera` methods. Declared as an implicit dependency, so the camera is started before this service. |
 | `task` | string | Optional |  Name of computer vision task performed by the model: "detect" (default) or "classify" |
 | `classes` | list of strings | Optional |  Restrict detections to the listed class names (e.g. `["cup"]`). Names must match `model.names`; unknown names are logged and skipped. Applies only when `task` is `"detect"`. |
 | `source_name` | string | Optional |  Image source name to select on multi-source cameras (e.g. `"color"` on an RGBD camera). When omitted, the first image returned by the camera is used. |
 | `verbose` | bool | Optional |  Enable Ultralytics' per-prediction logging to stdout. Defaults to `false`. Set to `true` only for debugging — it is very chatty. |
-| `confidence` | float | Optional |  Minimum detection confidence in (0, 1]. Defaults to `0.25` (the Ultralytics default). |
+| `confidence` | float | Optional |  Minimum detection confidence in (0, 1]. When unset, defers to the Ultralytics default (currently `0.25`). |
 
 ### Example Configurations
 
@@ -64,13 +101,18 @@ Local YOLOv8 model:
 }
 ```
 
-***Note:*** if using the `get_detections_from_camera` or `get_classifications_from_camera` API, any cameras you are using must be set in the `depends_on` array for the service configuration, for example:
+***Note:*** if using the `get_detections_from_camera`, `get_classifications_from_camera` or `capture_all_from_camera` API, set `camera_name` to the camera you want to read from:
 
 ```json
-      "depends_on": [
-        "cam"
-      ]
+{
+  "model_location": "yolov8n.pt",
+  "camera_name": "cam"
+}
 ```
+
+`viam-server` resolves `camera_name` as an implicit dependency and starts that camera before this service, so there is no need to add a `depends_on` entry.
+
+The `*_from_camera` methods take a camera name as an argument. Leave it empty to use the configured `camera_name`, or pass the name of any camera the service depends on. Existing configurations that list their cameras in `depends_on` continue to work unchanged.
 
 ## API
 

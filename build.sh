@@ -11,4 +11,4 @@ export PATH=$PATH:$HOME/.local/bin
 source $VENV_NAME/bin/activate
 
 uv run pyinstaller --onefile -p src src/main.py
-tar -czvf dist/archive.tar.gz ./dist/main meta.json
+tar -czvf dist/archive.tar.gz ./dist/main meta.json first_run.sh

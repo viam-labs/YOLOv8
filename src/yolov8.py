@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import ClassVar, Mapping, Any, Optional, List, cast
+from typing import ClassVar, Mapping, Any, Optional, List, Sequence, Tuple, cast
 from typing_extensions import Self
 from urllib.request import urlretrieve
 
@@ -43,6 +43,7 @@ class yolov8(Vision, EasyResource):
 
     model: YOLO
     device: str
+    confidence: Optional[float]
 
     @classmethod
     def new(
@@ -56,8 +57,12 @@ class yolov8(Vision, EasyResource):
         self.DEPS = dependencies
         self.task = str(attrs.get("task")) or None
         self.source_name = attrs.get("source_name") or None
+        self.camera_name = str(attrs.get("camera_name", ""))
         self.verbose = bool(attrs.get("verbose", False))
-        self.confidence = float(attrs.get("confidence", 0.25))
+        # Default to None so predict() inherits ultralytics' own confidence
+        # default rather than pinning it here (which would drift on an upgrade).
+        confidence = attrs.get("confidence")
+        self.confidence = float(confidence) if confidence is not None else None
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -103,7 +108,9 @@ class yolov8(Vision, EasyResource):
         return self
 
     @classmethod
-    def validate_config(cls, config: ComponentConfig):
+    def validate_config(
+        cls, config: ComponentConfig
+    ) -> Tuple[Sequence[str], Sequence[str]]:
         model = config.attributes.fields["model_location"].string_value
         if model == "":
             raise Exception("A model_location must be defined")
@@ -122,11 +129,36 @@ class yolov8(Vision, EasyResource):
                     f"confidence must be in (0, 1]; got {confidence}"
                 )
 
-        return [], []
+        camera_name = config.attributes.fields["camera_name"].string_value
+        required_deps = [camera_name] if camera_name != "" else []
+
+        return required_deps, []
+
+    def get_camera(self, camera_name: str) -> Camera:
+        """Resolve a camera the module was given as a dependency.
+
+        The configured `camera_name` is declared as an implicit dependency, so
+        viam-server hands it to the module without the machine config naming it
+        anywhere else. Cameras listed in the legacy `depends_on` array are also
+        present in `DEPS`, so passing one of those by name still resolves.
+        """
+        name = camera_name or self.camera_name
+        if name == "":
+            raise Exception(
+                "no camera specified: set the camera_name attribute on this service, "
+                "or pass a camera name to the *_from_camera method"
+            )
+
+        actual_cam = self.DEPS.get(Camera.get_resource_name(name))
+        if actual_cam is None:
+            raise Exception(
+                f"camera '{name}' is not a dependency of this service; "
+                f'set "camera_name": "{name}" in the service attributes'
+            )
+        return cast(Camera, actual_cam)
 
     async def get_cam_image(self, camera_name: str) -> ViamImage:
-        actual_cam = self.DEPS[Camera.get_resource_name(camera_name)]
-        cam = cast(Camera, actual_cam)
+        cam = self.get_camera(camera_name)
         if self.source_name:
             cam_images, _ = await cam.get_images(filter_source_names=[self.source_name])
         else:
