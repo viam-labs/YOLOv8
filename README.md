@@ -73,6 +73,8 @@ The following attributes are available for `viam-labs:vision:yolov8` model:
 | `source_name` | string | Optional |  Image source name to select on multi-source cameras (e.g. `"color"` on an RGBD camera). When omitted, the first image returned by the camera is used. |
 | `verbose` | bool | Optional |  Enable Ultralytics' per-prediction logging to stdout. Defaults to `false`. Set to `true` only for debugging — it is very chatty. |
 | `confidence` | float | Optional |  Minimum detection confidence in (0, 1]; detections below it are discarded. Defaults to `0.25` (the Ultralytics default). |
+| `save_detections` | bool | Optional |  Save every frame the detection API sees, along with the detections it produced. Defaults to `false`. See [Saving detections](#saving-detections). |
+| `save_dir` | string | Optional |  Where to write saved frames. Defaults to `~/.viam/capture/yolov8/<service name>`, which the data management service syncs to the cloud. Only read when `save_detections` is `true`. |
 
 ### Example Configurations
 
@@ -113,6 +115,93 @@ Local YOLOv8 model:
 `viam-server` resolves `camera_name` as an implicit dependency and starts that camera before this service, so there is no need to add a `depends_on` entry.
 
 The `*_from_camera` methods take a camera name as an argument. Leave it empty to use the configured `camera_name`, or pass the name of any camera the service depends on. Existing configurations that list their cameras in `depends_on` continue to work unchanged.
+
+## Saving detections
+
+Set `save_detections` to `true` and the module writes every frame the detection
+API sees, together with the detections it produced:
+
+```json
+{
+  "model_location": "yolov8n.pt",
+  "camera_name": "cam",
+  "save_detections": true
+}
+```
+
+This covers `get_detections`, `get_detections_from_camera` and
+`capture_all_from_camera` — all three run through the same path.
+
+Each call writes two files sharing a name stem:
+
+```
+2026-08-26T14-03-11-482913_a1b2c3d4.jpg
+2026-08-26T14-03-11-482913_a1b2c3d4.json
+```
+
+The image is stored as the camera produced it: JPEG and PNG frames are written
+byte-for-byte with no re-encoding, and anything else (RGBA, depth) is converted
+to PNG so it opens in ordinary image tools. The sidecar holds the detections
+plus enough context to interpret them:
+
+```json
+{
+  "captured_at": "2026-08-26T14:03:11.482913+00:00",
+  "service_name": "vision-1",
+  "camera_name": "cam",
+  "image_file": "2026-08-26T14-03-11-482913_a1b2c3d4.jpg",
+  "width": 640,
+  "height": 480,
+  "detections": [
+    {
+      "confidence": 0.87,
+      "class_name": "cup",
+      "x_min": 12,
+      "y_min": 40,
+      "x_max": 96,
+      "y_max": 210
+    }
+  ]
+}
+```
+
+Frames that produced no detections are saved too, with an empty `detections`
+array.
+
+A failed write never fails the detection call — the module logs the error and
+returns detections as usual.
+
+### Syncing to the cloud
+
+`save_dir` defaults to `yolov8/<service name>` inside viam-server's capture
+directory (`$VIAM_HOME/capture`, or `~/.viam/capture` when `VIAM_HOME` is
+unset). If the machine runs the **data management** service with cloud sync
+enabled, it uploads every file it finds under that directory — not only the
+capture files it writes itself — and **deletes each file once it has uploaded
+successfully**, so the directory stays bounded on its own.
+
+Files are written under a temporary name and renamed into place, so sync never
+picks up a half-written frame.
+
+To write somewhere else, point `save_dir` at that path — either your machine's
+configured `capture_dir`, or any path listed in the data manager's
+`additional_sync_paths`:
+
+```json
+{
+  "model_location": "yolov8n.pt",
+  "camera_name": "cam",
+  "save_detections": true,
+  "save_dir": "/data/yolo-captures"
+}
+```
+
+Uploaded images land under **Data → Files** as ordinary files, not as a dataset
+with drawn bounding boxes; the boxes stay in the JSON sidecar beside each image.
+
+***Note:*** with no cloud sync running, nothing prunes the directory. Every
+detection call writes a frame, so a continuously polled service will fill the
+disk. Either enable sync, or point `save_dir` at a volume you prune yourself.
 
 ## API
 

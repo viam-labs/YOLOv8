@@ -1,4 +1,9 @@
+import asyncio
+import json
 import os
+import uuid
+from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import ClassVar, Mapping, Any, Optional, List, Sequence, Tuple, cast
 from typing_extensions import Self
@@ -29,6 +34,22 @@ MODEL_DIR = os.environ.get(
     "VIAM_MODULE_DATA", os.path.join(os.path.expanduser("~"), ".data", "models")
 )
 
+# Root of viam-server's data-capture tree. The data manager syncs every file it
+# finds under here, not only the .capture files it writes itself, so dropping
+# plain images and JSON into a subdirectory is enough to get them uploaded.
+# VIAM_HOME mirrors how viam-server resolves the same location.
+VIAM_DOT_DIR = os.environ.get("VIAM_HOME") or os.path.join(
+    os.path.expanduser("~"), ".viam"
+)
+CAPTURE_DIR = os.path.join(VIAM_DOT_DIR, "capture")
+
+# Frames already in a standard encoding are saved byte-for-byte; anything else
+# (RGBA, depth) is re-encoded to PNG so the file opens in ordinary image tools.
+MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+}
+
 
 class yolov8(Vision, EasyResource):
     """
@@ -44,6 +65,8 @@ class yolov8(Vision, EasyResource):
     model: YOLO
     device: str
     confidence: float
+    save_detections: bool
+    save_dir: str
 
     @classmethod
     def new(
@@ -60,6 +83,16 @@ class yolov8(Vision, EasyResource):
         self.camera_name = str(attrs.get("camera_name", ""))
         self.verbose = bool(attrs.get("verbose", False))
         self.confidence = float(attrs.get("confidence", 0.25))
+
+        self.save_detections = bool(attrs.get("save_detections", False))
+        self.save_dir = ""
+        if self.save_detections:
+            self.save_dir = os.path.expanduser(
+                str(attrs.get("save_dir", ""))
+                or os.path.join(CAPTURE_DIR, "yolov8", config.name)
+            )
+            os.makedirs(self.save_dir, exist_ok=True)
+            self.logger.info(f"Saving detection frames and sidecars to {self.save_dir}")
 
         if "/" in model_location:
             if self.is_path(model_location):
@@ -126,6 +159,11 @@ class yolov8(Vision, EasyResource):
                     f"confidence must be in (0, 1]; got {confidence}"
                 )
 
+        if "save_detections" in config.attributes.fields:
+            field = config.attributes.fields["save_detections"]
+            if field.WhichOneof("kind") != "bool_value":
+                raise Exception("save_detections must be a boolean")
+
         camera_name = config.attributes.fields["camera_name"].string_value
         required_deps = [camera_name] if camera_name != "" else []
 
@@ -169,7 +207,8 @@ class yolov8(Vision, EasyResource):
         extra: Optional[Mapping[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> List[Detection]:
-        return await self.get_detections(await self.get_cam_image(camera_name))
+        image = await self.get_cam_image(camera_name)
+        return await self.detect(image, camera_name or self.camera_name)
 
     async def get_detections(
         self,
@@ -178,6 +217,20 @@ class yolov8(Vision, EasyResource):
         extra: Optional[Mapping[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> List[Detection]:
+        return await self.detect(image)
+
+    async def detect(self, image: ViamImage, camera_name: str = "") -> List[Detection]:
+        """Run detection on one frame, saving it afterwards when configured to.
+
+        Every entry point that produces detections funnels through here, so
+        saving covers the whole detection API rather than a single method.
+        """
+        detections = self.predict_detections(image)
+        if self.save_detections:
+            await self.save_capture(image, detections, camera_name)
+        return detections
+
+    def predict_detections(self, image: ViamImage) -> List[Detection]:
         detections = []
         results = self.model.predict(
             viam_to_pil_image(image),
@@ -264,7 +317,9 @@ class yolov8(Vision, EasyResource):
     ) -> CaptureAllResult:
         result = CaptureAllResult()
         result.image = await self.get_cam_image(camera_name)
-        result.detections = await self.get_detections(result.image)
+        result.detections = await self.detect(
+            result.image, camera_name or self.camera_name
+        )
         result.classifications = await self.get_classifications(result.image, 1)
         return result
 
@@ -279,6 +334,56 @@ class yolov8(Vision, EasyResource):
             detections_supported=True,
             object_point_clouds_supported=False,
         )
+
+    async def save_capture(
+        self, image: ViamImage, detections: List[Detection], camera_name: str
+    ) -> None:
+        """Write one frame and its detections into `save_dir`.
+
+        Errors are logged rather than raised: saving is a side effect of the
+        detection call and must never be able to fail the call itself.
+        """
+        try:
+            image_bytes, ext = self.encode_image(image)
+            now = datetime.now(timezone.utc)
+            # Colons are illegal in Windows filenames, so the stem spells the
+            # timestamp with dashes; the sidecar carries the real ISO-8601 one.
+            # The uuid suffix keeps concurrent calls from colliding within the
+            # same microsecond.
+            stem = f"{now.strftime('%Y-%m-%dT%H-%M-%S-%f')}_{uuid.uuid4().hex[:8]}"
+            image_file = stem + ext
+            payload = {
+                "captured_at": now.isoformat(),
+                "service_name": self.name,
+                "camera_name": camera_name or None,
+                "image_file": image_file,
+                "width": image.width,
+                "height": image.height,
+                "detections": detections,
+            }
+            await asyncio.to_thread(
+                write_capture_files,
+                os.path.join(self.save_dir, image_file),
+                image_bytes,
+                os.path.join(self.save_dir, stem + ".json"),
+                json.dumps(payload, indent=2).encode("utf-8"),
+            )
+        except Exception as err:
+            self.logger.error(
+                f"Failed to save detection capture to {self.save_dir}: {err}"
+            )
+
+    def encode_image(self, image: ViamImage) -> Tuple[bytes, str]:
+        """Return the bytes to save for `image` and the extension to save them under."""
+        # A ViamImage mime type can carry a "+lazy" suffix marking deferred
+        # encoding; only the base type matters for picking an extension.
+        mime = str(image.mime_type).split("+", 1)[0]
+        ext = MIME_TO_EXT.get(mime)
+        if ext is not None:
+            return image.data, ext
+        buffer = BytesIO()
+        viam_to_pil_image(image).save(buffer, format="PNG")
+        return buffer.getvalue(), ".png"
 
     def is_path(self, path: str) -> bool:
         try:
@@ -296,6 +401,27 @@ class yolov8(Vision, EasyResource):
     def log_progress(self, count: int, block_size: int, total_size: int) -> None:
         percent = count * block_size * 100 // total_size
         self.logger.debug(f"\rDownloading {self.MODEL_FILE}: {percent}%")
+
+
+def write_capture_files(
+    image_path: str, image_bytes: bytes, json_path: str, json_bytes: bytes
+) -> None:
+    """Write a frame and its sidecar, image first.
+
+    The sidecar goes last so that its presence guarantees the image beside it
+    is complete, however the two are picked up for sync.
+    """
+    write_atomic(image_path, image_bytes)
+    write_atomic(json_path, json_bytes)
+
+
+def write_atomic(path: str, data: bytes) -> None:
+    """Write `data` to `path` via a temp file and a rename.
+    """
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "wb") as tmp_file:
+        tmp_file.write(data)
+    os.replace(tmp_path, path)
 
 
 # vendored and updated from ultralyticsplus library
